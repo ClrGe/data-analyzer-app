@@ -121,7 +121,8 @@
         "y": 360,
         "wires": [
             [
-                "8afe377c8a8788c9"
+                "8afe377c8a8788c9",
+                "6d264804347e53de"
             ]
         ]
     },
@@ -130,7 +131,7 @@
         "type": "function",
         "z": "2ed26d8f84de01f4",
         "name": "retrieve UIC",
-        "func": "msg.length = msg.payload.length;\nmsg.save = msg.payload;\nvar referential = [msg.payload];\n\nlet result = [];\nlet zip = [];\n\n\nfor(let i = 0; i < referential.length ; i++){\n\n        for (let a = 0; a < referential[i].length; a++) {\n                msg.gare = referential[i][a][0];\n\n                msg.region = referential[i][a][1].toLowerCase();\n                msg.regionCap = msg.region.split(\" \");\n                for (let c = 0; c < msg.regionCap.length; c++) {\n                msg.regionCap[c] = msg.regionCap[c][0].toUpperCase() + msg.regionCap[c].substr(1);\n        }\n        msg.zipcode = referential[i][a][2];\n        msg.uiccode = referential[i][a][4];\n        msg.referential = referential;\n\n        result[a] = msg.uiccode;\n        zip[a] = msg.zipcode;\n        }\n}\nmsg.savezip = zip;\nmsg.saveuic = result;\nmsg.payload = result;\n\nreturn msg;",
+        "func": "msg.length = msg.payload.length;\nmsg.save = msg.payload;\nmsg.referential = msg.payload;\n\nmsg.result = [];\nmsg.station = [];\n\n\nfor (let i = 0; i < msg.length ; i++){\n\n    let data = {\n        \"gare\": msg.referential[i].nom_gare,\n        \"region\"  : msg.referential[i].region.toLowerCase(),\n        \"zipcode\" : msg.referential[i].zipcode,\n        \"uic_code\": msg.referential[i].uic_code\n    }\n    msg.station.push(data)\n    msg.result.push(data.uic_code);\n}\n\nmsg.payload = msg.result;\n\nreturn msg;",
         "outputs": 1,
         "noerr": 0,
         "initialize": "",
@@ -290,7 +291,7 @@
         "type": "function",
         "z": "2ed26d8f84de01f4",
         "name": "req",
-        "func": "let result = msg.saveuic;\nlet params = [];\nfor(let i = 0; i < result.length ; i++){\n\n        params[i] = \"uic=\"+result[i]\n\n}\nmsg.params = params.join(\"&\");\nreturn msg;",
+        "func": "let params = [];\nfor(let i = 0; i < msg.result.length ; i++){\n\n        params[i] = \"uic=\"+msg.result[i]\n\n}\nmsg.params = params.join(\"&\");\nreturn msg;",
         "outputs": 1,
         "noerr": 0,
         "initialize": "",
@@ -312,7 +313,7 @@
         "method": "GET",
         "ret": "txt",
         "paytoqs": "ignore",
-        "url": "http://127.0.0.1:8200/cell/station?{{{params}}}",
+        "url": "https://lab.jmg-conseil.eu/cell/station?{{{params}}}",
         "tls": "",
         "persist": false,
         "proxy": "",
@@ -324,7 +325,8 @@
         "y": 460,
         "wires": [
             [
-                "199c5fc5d049fa0e"
+                "199c5fc5d049fa0e",
+                "99968eaaa33fdeac"
             ]
         ]
     },
@@ -344,7 +346,7 @@
         "type": "function",
         "z": "2ed26d8f84de01f4",
         "name": "Organize data",
-        "func": "msg.result = [];\n\nmsg.separate = msg.payload.split('&');\nmsg.total = [];\nmsg.reseparate = [];\n\nlet result = [];\n\nfor (let r = 0; r < msg.length; r++) {\n    msg.reseparate[r] = msg.separate[r].split(' ');\n    msg.total[r] = Number(msg.reseparate[r][0]) + Number(msg.reseparate[r][1]) + Number(msg.reseparate[r][2]) + Number(msg.reseparate[r][3]) + Number(msg.reseparate[4]) + Number(msg.reseparate[r][5]) + Number(msg.reseparate[r][6]) + Number(msg.reseparate[r][6])\n\n    msg.data = {\n        \"code_uic\": Number(msg.saveuic[r]),\n        \"code_postal\": Number(msg.savezip[r]),\n        \"region\": msg.save[r][1].toLowerCase().split(' ').map((s) => s.charAt(0).toUpperCase() + s.substring(1)).join(' '),\n        \"nom_gare\": msg.save[r][0],\n        \"frequentation_annuelle\": {\n            \"a2015\": Number(msg.reseparate[r][0]),\n            \"a2016\": Number(msg.reseparate[r][1]),\n            \"a2017\": Number(msg.reseparate[r][2]),\n            \"a2018\": Number(msg.reseparate[r][3]),\n            \"a2019\": Number(msg.reseparate[r][4]),\n            \"a2020\": Number(msg.reseparate[r][5]),\n            \"a2021\": Number(msg.reseparate[r][6]),\n        },\n        \"frequentation_totale\": Number(msg.total[r])\n\n    }\n    var freq = msg.data.frequentation_annuelle;\n    msg.total[r] = freq.a2015 + freq.a2016 + freq.a2017 + freq.a2018 + freq.a2019 + freq.a2020 + freq.a2021;\n    msg.data.frequentation_totale = msg.total[r]\n    result[r] = msg.data;\n    if (msg.regionquery == true) {\n        msg.myparam = \"la région \" + msg.data.region;\n    } else {\n        msg.myparam = \"le code postal \"+ msg.data.code_postal;\n    }\n\n};\n\n\nmsg.payload = result;\n\n\nreturn msg;\n",
+        "func": "let rawData = msg.payload.split('&'), \n    data = [],\n    result = [],\n    total = [],\n    res,\n    r = 0;\n\nfor (r = 0; r < msg.save.length; r++) {\n\n    data[r] = rawData[r].split(' ');\n    total[r] = Number(data[r][0]) + Number(data[r][1]) + Number(data[r][2]) + Number(data[r][3]) + Number(data[4]) + Number(data[5]) + Number(data[r][6])\n    res = {\n        \"code_uic\": msg.station[r].uic_code,\n        \"nom_gare\": msg.station[r].gare,\n        \"code_postal\": msg.station[r].zipcode,\n        \"region\": msg.station[r].region,\n        \"frequentation_annuelle\": {\n            \"a2015\": Number(data[r][0]),\n            \"a2016\": Number(data[r][1]),\n            \"a2017\": Number(data[r][2]),\n            \"a2018\": Number(data[r][3]),\n            \"a2019\": Number(data[r][4]),\n            \"a2020\": Number(data[r][5]),\n            \"a2021\": Number(data[r][6]),\n        },\n        \"frequentation_totale\": 0\n\n    }\n    let f = res.frequentation_annuelle\n    res.frequentation_totale = f.a2015 + f.a2016 + f.a2017 + f.a2018 + f.a2019 + f.a2020 + f.a2021;\n\n    result.push(res);\n};\n\n\nmsg.payload = result;\n\n\nreturn msg;\n",
         "outputs": 1,
         "noerr": 0,
         "initialize": "",
@@ -354,7 +356,6 @@
         "y": 500,
         "wires": [
             [
-                "99968eaaa33fdeac",
                 "8cb921c8c69f27ba"
             ]
         ]
@@ -393,7 +394,7 @@
         "type": "function",
         "z": "2ed26d8f84de01f4",
         "name": "error",
-        "func": "msg.statusCode = 500;\nmsg.payload = \"Error while searching for a/several station(s) matching UIC ! Try again.\";\n\nreturn msg;",
+        "func": "msg.statusCode = 500;\nmsg.payload = \"Error while searching for station(s) matching query ! Try again.\";\n\nreturn msg;",
         "outputs": 1,
         "noerr": 0,
         "initialize": "",
@@ -588,7 +589,8 @@
         "tosidebar": true,
         "console": false,
         "tostatus": false,
-        "complete": "false",
+        "complete": "true",
+        "targetType": "full",
         "statusVal": "",
         "statusType": "auto",
         "x": 2780,
@@ -636,6 +638,22 @@
         ],
         "x": 1115,
         "y": 520,
+        "wires": []
+    },
+    {
+        "id": "6d264804347e53de",
+        "type": "debug",
+        "z": "2ed26d8f84de01f4",
+        "name": "debug 3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1100,
+        "y": 440,
         "wires": []
     }
 ]
